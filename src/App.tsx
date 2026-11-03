@@ -7,6 +7,7 @@ import { StatsOverview } from './components/StatsOverview';
 import { FileTreeViewer } from './components/FileTreeViewer';
 import { BundlePreview } from './components/BundlePreview';
 import { HowToUseSection } from './components/HowToUseSection';
+import { SponsorAd } from './components/SponsorAd';
 import {
   ShieldCheck,
   FileText,
@@ -95,7 +96,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Upload Dropzone (shown on empty state or collapsible above results) */}
+        {/* Upload Dropzone */}
         {!result ? (
           <div className="space-y-7 py-2">
             <Dropzone
@@ -255,10 +256,13 @@ export default function App() {
               )}
             </div>
 
-            {/* How to Use Section (collapsible below results for reference) */}
+            {/* How to Use Section */}
             <HowToUseSection />
           </div>
         )}
+
+        {/* Developer Sponsor / Partner Placement */}
+        <SponsorAd />
       </main>
 
       {/* Footer */}
