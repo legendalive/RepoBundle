@@ -1,0 +1,8 @@
+{
+  "name": "RepoBundle",
+  "description": "RepoBundle: Upload any zipped codebase to automatically bundle files by extension, generate a clean markdown file tree, and download a bundled archive.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
