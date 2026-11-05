@@ -2,13 +2,23 @@ import React, { useState } from 'react';
 import { BundlingResult } from '../types/bundler';
 import { formatBytes } from '../utils/treeGenerator';
 import { downloadBlob, getFullGroupContent } from '../utils/zipBundler';
-import { Copy, Check, Download, FileText, FileCode, Info, AlertTriangle } from 'lucide-react';
+import {
+  Copy,
+  Check,
+  Download,
+  FileText,
+  FileCode,
+  Info,
+  AlertTriangle,
+  Sparkles,
+} from 'lucide-react';
 
 interface BundlePreviewProps {
   result: BundlingResult;
   selectedExtension: string;
   onSelectExtension: (ext: string) => void;
   onDownloadZip: () => void;
+  initialTab?: 'codebase' | 'bundle' | 'markdown';
 }
 
 export const BundlePreview: React.FC<BundlePreviewProps> = ({
@@ -16,46 +26,75 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
   selectedExtension,
   onSelectExtension,
   onDownloadZip,
+  initialTab = 'codebase',
 }) => {
-  const [activeTab, setActiveTab] = useState<'bundle' | 'markdown'>('bundle');
+  const [activeTab, setActiveTab] = useState<'codebase' | 'bundle' | 'markdown'>(initialTab);
   const [copied, setCopied] = useState(false);
   const [copying, setCopying] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const currentGroup = result.groups.find((g) => g.extension === selectedExtension) || result.groups[0];
 
-  const contentToDisplay = activeTab === 'markdown'
-    ? result.markdownTree
-    : (currentGroup ? currentGroup.previewContent : '');
+  let contentToDisplay = '';
+  let displayFileName = '';
 
-  const displayFileName = activeTab === 'markdown'
-    ? 'FILE_TREE.md'
-    : (currentGroup ? currentGroup.bundleFileName : '');
+  if (activeTab === 'codebase') {
+    contentToDisplay = result.fullCodebasePreview;
+    displayFileName = 'CODEBASE.md';
+  } else if (activeTab === 'markdown') {
+    contentToDisplay = result.markdownTree;
+    displayFileName = 'FILE_TREE.md';
+  } else {
+    contentToDisplay = currentGroup ? currentGroup.previewContent : '';
+    displayFileName = currentGroup ? currentGroup.bundleFileName : '';
+  }
 
   const handleCopy = async () => {
     if (copying) return;
     setCopying(true);
+    setCopyError(null);
+
     try {
-      if (activeTab === 'markdown') {
+      if (activeTab === 'codebase') {
+        if (result.fullCodebaseBlob) {
+          const fullText = await result.fullCodebaseBlob.text();
+          await navigator.clipboard.writeText(fullText);
+        } else {
+          await navigator.clipboard.writeText(result.fullCodebasePreview);
+        }
+      } else if (activeTab === 'markdown') {
         await navigator.clipboard.writeText(result.markdownTree);
       } else if (currentGroup) {
         const fullText = await getFullGroupContent(currentGroup);
         await navigator.clipboard.writeText(fullText);
       }
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err: any) {
       console.error('Failed to copy full text to clipboard:', err);
+      setCopyError('Clipboard limit exceeded for large payload. Please use "Save CODEBASE.md" download instead.');
+      setTimeout(() => setCopyError(null), 5000);
     } finally {
       setCopying(false);
     }
   };
 
   const handleDownloadSingle = () => {
-    if (activeTab === 'markdown') {
+    if (activeTab === 'codebase') {
+      if (result.fullCodebaseBlob) {
+        downloadBlob(result.fullCodebaseBlob, 'CODEBASE.md');
+      }
+    } else if (activeTab === 'markdown') {
       const blob = new Blob([result.markdownTree], { type: 'text/markdown;charset=utf-8' });
       downloadBlob(blob, 'FILE_TREE.md');
     } else if (currentGroup) {
       downloadBlob(currentGroup.fullBlob, currentGroup.bundleFileName);
+    }
+  };
+
+  const handleDownloadCodebaseDirect = () => {
+    if (result.fullCodebaseBlob) {
+      downloadBlob(result.fullCodebaseBlob, 'CODEBASE.md');
     }
   };
 
@@ -67,8 +106,21 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
         <div className="flex items-center gap-1 bg-[#161922] p-1 rounded-lg border border-[#252a38]">
           <button
             type="button"
+            onClick={() => setActiveTab('codebase')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+              activeTab === 'codebase'
+                ? 'bg-gradient-to-r from-[#d4a359] to-[#c79449] text-stone-950 shadow-sm font-bold'
+                : 'text-stone-400 hover:text-stone-200'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>CODEBASE.md (AI Context)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('bundle')}
-            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
               activeTab === 'bundle'
                 ? 'bg-[#d4a359] text-stone-950 shadow-sm font-bold'
                 : 'text-stone-400 hover:text-stone-200'
@@ -77,10 +129,11 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
             <FileCode className="w-3.5 h-3.5" />
             <span>Bundled Code ({currentGroup?.label || ''})</span>
           </button>
+
           <button
             type="button"
             onClick={() => setActiveTab('markdown')}
-            className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
               activeTab === 'markdown'
                 ? 'bg-[#d4a359] text-stone-950 shadow-sm font-bold'
                 : 'text-stone-400 hover:text-stone-200'
@@ -91,7 +144,7 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
           </button>
         </div>
 
-        {/* Extension Dropdown */}
+        {/* Extension Dropdown (only when viewing extension bundles) */}
         {activeTab === 'bundle' && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-stone-400 font-mono">Bundle:</span>
@@ -109,7 +162,7 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
           </div>
         )}
 
-        {/* Actions: Copy & Downloads */}
+        {/* Actions: Copy & Single File Download */}
         <div className="flex items-center gap-2 ml-auto">
           <button
             type="button"
@@ -120,14 +173,16 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
             {copied ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-semibold">Full File Copied!</span>
+                <span className="text-emerald-400 font-semibold">
+                  {activeTab === 'codebase' ? 'Full Codebase Copied!' : 'Full File Copied!'}
+                </span>
               </>
             ) : copying ? (
               <span className="text-stone-400">Copying...</span>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5 text-[#d4a359]" />
-                <span>Copy Full File</span>
+                <span>{activeTab === 'codebase' ? 'Copy Entire Codebase for AI' : 'Copy Full File'}</span>
               </>
             )}
           </button>
@@ -143,7 +198,25 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
         </div>
       </div>
 
-      {/* Truncation notice for huge bundles in DOM viewer */}
+      {/* Copy Error Message if Browser Clipboard Overflows */}
+      {copyError && (
+        <div className="px-4 py-2 bg-rose-950/40 border-b border-rose-800/40 flex items-center gap-2 text-xs text-rose-200">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+          <span>{copyError}</span>
+        </div>
+      )}
+
+      {/* Truncation notice for huge codebase in DOM viewer */}
+      {activeTab === 'codebase' && result.isFullCodebaseTruncatedInPreview && (
+        <div className="px-4 py-2 bg-amber-950/30 border-b border-amber-800/40 flex items-center gap-2 text-xs text-amber-200">
+          <AlertTriangle className="w-4 h-4 shrink-0 text-[#d4a359]" />
+          <span>
+            Large Codebase Safeguard: Showing preview in browser DOM for smooth performance. <strong>100% of all {result.totalFiles.toLocaleString()} files ({formatBytes(result.fullCodebaseSize)})</strong> are fully preserved and unedited in the downloaded <code className="text-[#f5f1eb] font-mono font-bold">CODEBASE.md</code> and clipboard copy.
+          </span>
+        </div>
+      )}
+
+      {/* Truncation notice for huge extension bundles in DOM viewer */}
       {activeTab === 'bundle' && currentGroup?.isTruncatedInPreview && (
         <div className="px-4 py-2 bg-amber-950/30 border-b border-amber-800/40 flex items-center gap-2 text-xs text-amber-200">
           <AlertTriangle className="w-4 h-4 shrink-0 text-[#d4a359]" />
@@ -156,47 +229,66 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
       {/* Info strip */}
       <div className="px-4 py-2 bg-[#0c0e14] border-b border-[#1b1f2b] flex flex-wrap items-center justify-between gap-3 text-xs text-stone-400">
         <div className="flex items-center gap-2 font-mono text-[11px]">
-          <span className="text-stone-200 font-semibold">{displayFileName}</span>
+          <span className="text-[#f5f1eb] font-semibold">{displayFileName}</span>
           <span aria-hidden="true" className="text-stone-600">·</span>
           <span>
-            {activeTab === 'markdown'
+            {activeTab === 'codebase'
+              ? `${result.totalFiles.toLocaleString()} files · ${result.fullCodebaseTotalLines.toLocaleString()} code lines`
+              : activeTab === 'markdown'
               ? `${result.markdownTree.split('\n').length.toLocaleString()} lines`
               : `${currentGroup?.files.length} files · ${currentGroup?.totalLines.toLocaleString()} lines`}
           </span>
           <span aria-hidden="true" className="text-stone-600">·</span>
           <span>
-            {activeTab === 'markdown'
+            {activeTab === 'codebase'
+              ? formatBytes(result.fullCodebaseSize)
+              : activeTab === 'markdown'
               ? formatBytes(new Blob([result.markdownTree]).size)
               : formatBytes(currentGroup?.totalBytes || 0)}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-mono">
+        <div className="flex items-center gap-1.5 text-[11px] text-stone-400 font-mono">
           <Info className="w-3.5 h-3.5 text-[#d4a359]" />
-          <span>Verbatim concatenation · Zero alterations</span>
+          <span>
+            {activeTab === 'codebase'
+              ? 'Complete codebase + ASCII directory tree · 100% unedited'
+              : 'Verbatim concatenation · Zero alterations'}
+          </span>
         </div>
       </div>
 
       {/* Code Text Viewer */}
       <div className="flex-1 relative overflow-hidden bg-[#090a0e]">
         <pre className="p-4 overflow-auto max-h-[520px] font-mono text-xs text-stone-300 leading-relaxed whitespace-pre selection:bg-[#d4a359] selection:text-stone-950">
-          {contentToDisplay || '// No content in this bundle.'}
+          {contentToDisplay || '// No content available.'}
         </pre>
       </div>
 
       {/* Bottom Download CTA Bar */}
       <div className="p-4 border-t border-[#1e222d] bg-[#0e1017] flex flex-wrap items-center justify-between gap-4">
         <div className="text-xs text-stone-400">
-          Ready to export? All <span className="font-mono text-[#f5f1eb] font-semibold">{result.groups.length}</span> bundles and <span className="font-mono text-[#f5f1eb] font-semibold">FILE_TREE.md</span> packaged into a single archive.
+          Ready to export? Includes <span className="font-mono text-[#f5f1eb] font-semibold">CODEBASE.md</span> (for AI), <span className="font-mono text-[#f5f1eb] font-semibold">FILE_TREE.md</span>, and <span className="font-mono text-[#f5f1eb] font-semibold">{result.groups.length}</span> extension bundles.
         </div>
-        <button
-          type="button"
-          onClick={onDownloadZip}
-          className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-stone-950 bg-gradient-to-r from-[#e2b76c] to-[#c9944d] hover:from-[#ecc279] hover:to-[#d4a05a] rounded-lg transition-all shadow-[0_2px_12px_rgba(212,163,89,0.22)] ml-auto cursor-pointer"
-        >
-          <Download className="w-4 h-4 stroke-[2.5]" />
-          <span>Download All Bundles (ZIP Archive)</span>
-        </button>
+        <div className="flex items-center gap-3 ml-auto">
+          <button
+            type="button"
+            onClick={handleDownloadCodebaseDirect}
+            className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#202534] border border-[#2b3345] rounded-lg transition-colors cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-[#d4a359]" />
+            <span>Download CODEBASE.md (AI)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onDownloadZip}
+            className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-stone-950 bg-gradient-to-r from-[#e2b76c] to-[#c9944d] hover:from-[#ecc279] hover:to-[#d4a05a] rounded-lg transition-all shadow-[0_2px_12px_rgba(212,163,89,0.22)] cursor-pointer"
+          >
+            <Download className="w-4 h-4 stroke-[2.5]" />
+            <span>Download All Bundles (ZIP)</span>
+          </button>
+        </div>
       </div>
     </div>
   );
