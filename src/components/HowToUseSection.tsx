@@ -31,7 +31,7 @@ export const HowToUseSection: React.FC = () => {
               How RepoBundle Works · End-to-End Workflow
             </h3>
             <p className="text-xs text-stone-400 mt-0.5">
-              From local folder compression to instant AI-ready codebase markdown &amp; extension bundles
+              From local folder compression to instant unedited codebase export (TXT &amp; MD) &amp; extension bundles
             </p>
           </div>
         </div>
@@ -95,7 +95,7 @@ export const HowToUseSection: React.FC = () => {
               </div>
 
               <div className="p-2 rounded-lg bg-[#18140c] border border-[#d4a359]/25 text-[11px] text-[#e0b471] leading-tight">
-                <strong>Instant Execution:</strong> Extraction, extension sorting, and CODEBASE.md compilation start automatically on drop.
+                <strong>Instant Execution:</strong> Extraction, extension sorting, CODEBASE.txt, and CODEBASE.md compilation start automatically on drop.
               </div>
             </div>
 
@@ -112,14 +112,14 @@ export const HowToUseSection: React.FC = () => {
                   Inspect & Verify
                 </h4>
                 <p className="text-xs text-stone-400 leading-relaxed">
-                  Review the interactive directory tree, file sizes, and lines. Inspect unedited code in <span className="font-mono text-stone-300">CODEBASE.md</span> or single extension bundles.
+                  Review the interactive directory tree, file sizes, and lines. Inspect unedited code in <span className="font-mono text-stone-300">CODEBASE.txt</span>, <span className="font-mono text-stone-300">CODEBASE.md</span>, or extension bundles.
                 </p>
               </div>
 
               <div className="space-y-1 pt-2 border-t border-[#181b24] text-[11px] text-stone-400">
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
-                  <span>100% Verbatim &amp; Unedited</span>
+                  <span>100% Verbatim &amp; Zero Alterations</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
@@ -138,17 +138,17 @@ export const HowToUseSection: React.FC = () => {
                   <Download className="w-4 h-4 text-[#d4a359]" />
                 </div>
                 <h4 className="text-xs font-bold text-[#f5f1eb] uppercase tracking-wider mb-2">
-                  Export for AI or ZIP
+                  Export as TXT, MD, or ZIP
                 </h4>
                 <p className="text-xs text-stone-400 leading-relaxed">
-                  Click <strong>Download CODEBASE.md</strong> to feed your entire repository to AI assistants, or <strong>Download Bundled ZIP</strong> for the full package.
+                  Click <strong>Download as TXT</strong> or <strong>Download as MD</strong> to export your full codebase into a single file for AI, or <strong>Download All (ZIP)</strong>.
                 </p>
               </div>
 
               <div className="pt-2 border-t border-[#181b24] text-[11px] text-stone-400">
                 <div className="flex items-center gap-1 text-[#e0b471]">
                   <Sparkles className="w-3 h-3 text-[#d4a359] shrink-0" />
-                  <span>One-click clipboard copy for prompt injection</span>
+                  <span>One-click clipboard copy for quick AI prompts</span>
                 </div>
               </div>
             </div>
@@ -165,7 +165,7 @@ export const HowToUseSection: React.FC = () => {
               <span aria-hidden="true">·</span>
               <span>Unlimited repository scale</span>
               <span aria-hidden="true">·</span>
-              <span>Optimized for LLMs</span>
+              <span>Pure text conversion</span>
             </div>
           </div>
         </div>
