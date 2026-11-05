@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 import { ZipEntryItem, ExtensionGroup, BundlingResult } from '../types/bundler';
 import { formatFileHeader } from './commentDelimiters';
-import { buildTreeHierarchy, buildCompleteAsciiTree, generateMarkdownReport } from './treeGenerator';
+import { buildTreeHierarchy, buildCompleteAsciiTree, generateMarkdownReport, formatBytes } from './treeGenerator';
 
 // Known binary extensions
 const BINARY_EXTENSIONS = new Set([
@@ -11,6 +11,54 @@ const BINARY_EXTENSIONS = new Set([
   'woff', 'woff2', 'ttf', 'eot', 'otf',
   'exe', 'dll', 'so', 'dylib', 'bin', 'iso', 'pyc', 'class'
 ]);
+
+// Language identifier mappings for markdown code fences in CODEBASE.md
+const EXTENSION_TO_LANG: Record<string, string> = {
+  ts: 'typescript',
+  tsx: 'tsx',
+  js: 'javascript',
+  jsx: 'jsx',
+  mjs: 'javascript',
+  cjs: 'javascript',
+  py: 'python',
+  rs: 'rust',
+  go: 'go',
+  java: 'java',
+  c: 'c',
+  cpp: 'cpp',
+  h: 'c',
+  hpp: 'cpp',
+  cs: 'csharp',
+  html: 'html',
+  htm: 'html',
+  css: 'css',
+  scss: 'scss',
+  sass: 'sass',
+  less: 'less',
+  json: 'json',
+  yaml: 'yaml',
+  yml: 'yaml',
+  sql: 'sql',
+  sh: 'bash',
+  bash: 'bash',
+  zsh: 'bash',
+  md: 'markdown',
+  markdown: 'markdown',
+  xml: 'xml',
+  svg: 'xml',
+  php: 'php',
+  rb: 'ruby',
+  swift: 'swift',
+  kt: 'kotlin',
+  kts: 'kotlin',
+  dart: 'dart',
+  lua: 'lua',
+  r: 'r',
+  toml: 'toml',
+  ini: 'ini',
+  dockerfile: 'dockerfile',
+  env: 'dotenv',
+};
 
 // Maximum characters kept in memory specifically for UI DOM preview to prevent browser freezes
 const MAX_PREVIEW_CHARS = 180_000;
@@ -56,6 +104,17 @@ function decodeText(buffer: Uint8Array): string {
 }
 
 /**
+ * Determines a safe markdown backtick fence that will not collide with backticks inside code content.
+ */
+function getSafeCodeFence(content: string): string {
+  let fence = '```';
+  while (content.includes(fence)) {
+    fence += '`';
+  }
+  return fence;
+}
+
+/**
  * Yield execution to browser event loop to prevent UI lockup during large archive processing.
  */
 function yieldToEventLoop(): Promise<void> {
@@ -94,8 +153,10 @@ export async function processZipFile(
   // Group files by extension immediately during extraction
   const extensionMap = new Map<string, RawExtractedEntry[]>();
   const lightweightEntries: ZipEntryItem[] = [];
+  const allExtractedEntries: RawExtractedEntry[] = [];
   let totalDirectories = 0;
   let totalBytes = 0;
+  let totalCodeLines = 0;
 
   for (let i = 0; i < totalEntries; i++) {
     const relativePath = fileKeys[i];
@@ -103,7 +164,7 @@ export async function processZipFile(
 
     // Periodically yield to browser to prevent UI lockups and report progress
     if (i % 25 === 0 || i === totalEntries - 1) {
-      const pct = 10 + Math.floor((i / totalEntries) * 45);
+      const pct = 10 + Math.floor((i / totalEntries) * 40);
       onProgress?.(pct, `Reading entry ${i + 1} of ${totalEntries} (${relativePath})...`);
       await yieldToEventLoop();
     }
@@ -127,6 +188,7 @@ export async function processZipFile(
         if (uint8Array[b] === 10) count++; // newline \n
       }
       lineCount = uint8Array.length > 0 ? count + 1 : 0;
+      totalCodeLines += lineCount;
     }
 
     const rawEntry: RawExtractedEntry = {
@@ -138,6 +200,8 @@ export async function processZipFile(
       lineCount,
       buffer: uint8Array,
     };
+
+    allExtractedEntries.push(rawEntry);
 
     if (!extensionMap.has(ext)) {
       extensionMap.set(ext, []);
@@ -155,18 +219,107 @@ export async function processZipFile(
     });
   }
 
-  onProgress?.(60, 'Building visual directory tree and hierarchy metrics...');
+  onProgress?.(55, 'Building visual directory tree and hierarchy metrics...');
   await yieldToEventLoop();
 
   const cleanArchiveBase = fileName.replace(/\.zip$/i, '');
   const rootNode = buildTreeHierarchy(lightweightEntries, cleanArchiveBase);
   const asciiTree = buildCompleteAsciiTree(rootNode);
 
-  onProgress?.(70, 'Consolidating files by extension (100% unaltered verbatim code)...');
+  // Sort all extracted files alphabetically by relative path for consistent reading order
+  allExtractedEntries.sort((a, b) => a.path.localeCompare(b.path));
+
+  onProgress?.(65, 'Generating unified CODEBASE.md for AI context (100% verbatim)...');
+  await yieldToEventLoop();
+
+  // Assemble CODEBASE.md chunk-by-chunk to handle large repositories with low memory footprint
+  const codebaseChunks: string[] = [];
+  let fullCodebasePreview = '';
+  let isFullCodebaseTruncated = false;
+
+  const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const codebaseHeader = `# Repository Codebase: ${fileName}
+
+> Ingestion and AI context package generated on ${timestamp} UTC by RepoBundle.
+> Contains 100% verbatim, unedited source code across all files and complete directory hierarchy.
+> Designed for direct input into AI models (Claude, ChatGPT, Gemini, etc.) for debugging, code review, and architectural analysis.
+
+## Repository Overview
+- **Source Archive**: \`${fileName}\`
+- **Total Files**: ${lightweightEntries.length.toLocaleString()}
+- **Total Directories**: ${totalDirectories.toLocaleString()}
+- **Total Uncompressed Size**: ${formatBytes(totalBytes)} (${totalBytes.toLocaleString()} bytes)
+- **Total Code Lines**: ${totalCodeLines.toLocaleString()}
+- **File Types**: ${extensionMap.size} unique extensions
+
+## Directory Hierarchy & File Tree
+\`\`\`text
+${asciiTree}
+\`\`\`
+
+## Codebase Files
+`;
+
+  codebaseChunks.push(codebaseHeader);
+  fullCodebasePreview += codebaseHeader;
+
+  const totalFilesToBundle = allExtractedEntries.length;
+  for (let fIdx = 0; fIdx < totalFilesToBundle; fIdx++) {
+    const entry = allExtractedEntries[fIdx];
+
+    if (fIdx % 25 === 0) {
+      const pct = 65 + Math.floor((fIdx / totalFilesToBundle) * 15);
+      onProgress?.(pct, `Compiling AI context: file ${fIdx + 1}/${totalFilesToBundle} (${entry.name})...`);
+      await yieldToEventLoop();
+    }
+
+    if (entry.isBinary) {
+      const binaryNotice = `\n---\n\n### File: \`${entry.path}\`\n\n*(Binary file · ${formatBytes(entry.size)} · Raw binary content omitted for LLM token efficiency)*\n`;
+      codebaseChunks.push(binaryNotice);
+
+      if (!isFullCodebaseTruncated) {
+        if (fullCodebasePreview.length + binaryNotice.length < MAX_PREVIEW_CHARS) {
+          fullCodebasePreview += binaryNotice;
+        } else {
+          isFullCodebaseTruncated = true;
+          fullCodebasePreview += '\n\n... [PREVIEW TRUNCATED IN DOM VIEWER FOR BROWSER PERFORMANCE · 100% VERBATIM CODE IS PRESERVED IN CODEBASE.MD DOWNLOAD AND FULL CLIPBOARD COPY] ...\n';
+        }
+      }
+    } else {
+      const text = decodeText(entry.buffer);
+      const fence = getSafeCodeFence(text);
+      const lang = EXTENSION_TO_LANG[entry.extension] || entry.extension || '';
+      
+      const fileHeader = `\n---\n\n### File: \`${entry.path}\`\n${fence}${lang}\n`;
+      const fileFooter = text.endsWith('\n') ? `${fence}\n` : `\n${fence}\n`;
+
+      codebaseChunks.push(fileHeader);
+      codebaseChunks.push(text);
+      codebaseChunks.push(fileFooter);
+
+      if (!isFullCodebaseTruncated) {
+        const fullBlockLength = fileHeader.length + text.length + fileFooter.length;
+        if (fullCodebasePreview.length + fullBlockLength < MAX_PREVIEW_CHARS) {
+          fullCodebasePreview += fileHeader + text + fileFooter;
+        } else {
+          const remainingSpace = Math.max(0, MAX_PREVIEW_CHARS - fullCodebasePreview.length);
+          fullCodebasePreview += (fileHeader + text).substring(0, remainingSpace) + '\n\n... [PREVIEW TRUNCATED IN DOM VIEWER FOR BROWSER PERFORMANCE · 100% VERBATIM CODE IS PRESERVED IN CODEBASE.MD DOWNLOAD AND FULL CLIPBOARD COPY] ...\n';
+          isFullCodebaseTruncated = true;
+        }
+      }
+    }
+  }
+
+  const fullCodebaseBlob = new Blob(codebaseChunks, { type: 'text/markdown;charset=utf-8' });
+
+  onProgress?.(80, 'Consolidating files by extension (100% unaltered verbatim code)...');
   await yieldToEventLoop();
 
   const groups: ExtensionGroup[] = [];
   const outputZip = new JSZip();
+
+  // Add the unified CODEBASE.md into the output ZIP archive as well
+  outputZip.file('CODEBASE.md', fullCodebaseBlob);
 
   // Sort groups by total file count descending
   const sortedExtensions = Array.from(extensionMap.keys()).sort((a, b) => {
@@ -280,13 +433,13 @@ export async function processZipFile(
     }
 
     if (gIdx % 3 === 0) {
-      const pct = 70 + Math.floor((gIdx / totalGroups) * 15);
+      const pct = 80 + Math.floor((gIdx / totalGroups) * 10);
       onProgress?.(pct, `Bundling ${ext} (${gIdx + 1}/${totalGroups})...`);
       await yieldToEventLoop();
     }
   }
 
-  onProgress?.(88, 'Composing FILE_TREE.md markdown report...');
+  onProgress?.(90, 'Composing FILE_TREE.md markdown report...');
   await yieldToEventLoop();
 
   const markdownTree = generateMarkdownReport(
@@ -323,6 +476,12 @@ export async function processZipFile(
     outputZipBlob,
     outputZipSize: outputZipBlob.size,
     processingTimeMs: Math.round(endTime - startTime),
+    // Unified single-file Codebase Markdown for AI context
+    fullCodebaseBlob,
+    fullCodebasePreview,
+    isFullCodebaseTruncatedInPreview: isFullCodebaseTruncated,
+    fullCodebaseSize: fullCodebaseBlob.size,
+    fullCodebaseTotalLines: totalCodeLines,
   };
 }
 
