@@ -16,6 +16,7 @@ import {
   Download,
   RotateCcw,
   Archive,
+  Sparkles,
 } from 'lucide-react';
 
 export default function App() {
@@ -25,7 +26,7 @@ export default function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<BundlingResult | null>(null);
   const [selectedExtension, setSelectedExtension] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'preview' | 'tree' | 'raw-markdown'>('preview');
+  const [activeTab, setActiveTab] = useState<'codebase' | 'preview' | 'tree' | 'raw-markdown'>('codebase');
 
   const handleProcessFile = async (file: File) => {
     setIsLoading(true);
@@ -43,6 +44,7 @@ export default function App() {
       if (res.groups.length > 0) {
         setSelectedExtension(res.groups[0].extension);
       }
+      setActiveTab('codebase');
     } catch (err: any) {
       console.error('Extraction error:', err);
       setErrorMessage(
@@ -59,6 +61,11 @@ export default function App() {
     downloadBlob(result.outputZipBlob, `${cleanName}_bundled.zip`);
   };
 
+  const handleDownloadCodebase = () => {
+    if (!result || !result.fullCodebaseBlob) return;
+    downloadBlob(result.fullCodebaseBlob, 'CODEBASE.md');
+  };
+
   const handleReset = () => {
     setResult(null);
     setErrorMessage(null);
@@ -71,6 +78,7 @@ export default function App() {
       {/* Top Bar Header */}
       <Header
         onDownloadZip={handleDownloadAllZip}
+        onDownloadCodebase={handleDownloadCodebase}
         hasResult={!!result}
         onReset={handleReset}
         activeTab={activeTab}
@@ -96,7 +104,7 @@ export default function App() {
           </div>
         </section>
 
-        {/* Upload Dropzone */}
+        {/* Upload Dropzone (shown on empty state or collapsible above results) */}
         {!result ? (
           <div className="space-y-7 py-2">
             <Dropzone
@@ -127,19 +135,28 @@ export default function App() {
                     <span className="text-xs text-emerald-400 font-medium">Bundled Successfully</span>
                   </div>
                   <div className="text-xs text-stone-400 mt-0.5 font-mono tabular-nums">
-                    {result.totalFiles.toLocaleString()} files detected across {result.groups.length} extension groups
+                    {result.totalFiles.toLocaleString()} files detected · CODEBASE.md ready for AI ingestion
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 hover:text-white bg-[#181c26] hover:bg-[#202534] border border-[#242b3a] rounded-lg transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-stone-300 hover:text-white bg-[#181c26] hover:bg-[#202534] border border-[#242b3a] rounded-lg transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-stone-400" />
                   <span>Upload Another ZIP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadCodebase}
+                  className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#222736] hover:text-white border border-[#2b3345] rounded-lg transition-colors cursor-pointer shadow-sm"
+                >
+                  <Sparkles className="w-4 h-4 text-[#d4a359]" />
+                  <span>Download CODEBASE.md (For AI)</span>
                 </button>
 
                 <button
@@ -167,7 +184,20 @@ export default function App() {
             <div className="space-y-4">
               {/* View Switcher Controls */}
               <div className="flex items-center justify-between gap-4 border-b border-[#1e222d] pb-3">
-                <div className="flex items-center gap-1 bg-[#12141c] p-1 rounded-lg border border-[#1e2330]">
+                <div className="flex flex-wrap items-center gap-1 bg-[#12141c] p-1 rounded-lg border border-[#1e2330]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('codebase')}
+                    className={`flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
+                      activeTab === 'codebase'
+                        ? 'bg-gradient-to-r from-[#d4a359] to-[#c79449] text-stone-950 shadow-sm font-bold'
+                        : 'text-stone-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>CODEBASE.md (Full Codebase for AI)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => setActiveTab('preview')}
@@ -204,7 +234,7 @@ export default function App() {
                     }`}
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    <span>Generated FILE_TREE.md</span>
+                    <span>FILE_TREE.md</span>
                   </button>
                 </div>
 
@@ -216,6 +246,26 @@ export default function App() {
               </div>
 
               {/* View Content */}
+              {activeTab === 'codebase' && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                  <div className="lg:col-span-4 h-[640px]">
+                    <FileTreeViewer
+                      rootNode={result.rootTreeNode}
+                      archiveName={result.archiveName}
+                    />
+                  </div>
+                  <div className="lg:col-span-8 h-[640px]">
+                    <BundlePreview
+                      result={result}
+                      selectedExtension={selectedExtension}
+                      onSelectExtension={setSelectedExtension}
+                      onDownloadZip={handleDownloadAllZip}
+                      initialTab="codebase"
+                    />
+                  </div>
+                </div>
+              )}
+
               {activeTab === 'preview' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
                   <div className="lg:col-span-4 h-[640px]">
@@ -230,6 +280,7 @@ export default function App() {
                       selectedExtension={selectedExtension}
                       onSelectExtension={setSelectedExtension}
                       onDownloadZip={handleDownloadAllZip}
+                      initialTab="bundle"
                     />
                   </div>
                 </div>
@@ -251,12 +302,13 @@ export default function App() {
                     selectedExtension={selectedExtension}
                     onSelectExtension={setSelectedExtension}
                     onDownloadZip={handleDownloadAllZip}
+                    initialTab="markdown"
                   />
                 </div>
               )}
             </div>
 
-            {/* How to Use Section */}
+            {/* How to Use Section (collapsible below results for reference) */}
             <HowToUseSection />
           </div>
         )}
