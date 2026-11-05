@@ -72,7 +72,7 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
       setTimeout(() => setCopied(false), 2500);
     } catch (err: any) {
       console.error('Failed to copy full text to clipboard:', err);
-      setCopyError('Clipboard limit exceeded for large payload. Please use "Save CODEBASE.md" download instead.');
+      setCopyError('Clipboard limit exceeded for large payload. Please use "Save CODEBASE.md" or "Save CODEBASE.txt" download instead.');
       setTimeout(() => setCopyError(null), 5000);
     } finally {
       setCopying(false);
@@ -89,6 +89,12 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
       downloadBlob(blob, 'FILE_TREE.md');
     } else if (currentGroup) {
       downloadBlob(currentGroup.fullBlob, currentGroup.bundleFileName);
+    }
+  };
+
+  const handleDownloadTextDirect = () => {
+    if (result.fullCodebaseTextBlob) {
+      downloadBlob(result.fullCodebaseTextBlob, 'CODEBASE.txt');
     }
   };
 
@@ -187,14 +193,37 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={handleDownloadSingle}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 bg-[#1a1e28] hover:bg-[#232836] hover:text-white border border-[#272e3f] rounded-lg transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5 text-stone-400" />
-            <span>Save {displayFileName}</span>
-          </button>
+          {activeTab === 'codebase' ? (
+            <>
+              <button
+                type="button"
+                onClick={handleDownloadTextDirect}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 bg-[#1a1e28] hover:bg-[#232836] hover:text-white border border-[#272e3f] rounded-lg transition-colors cursor-pointer"
+                title="Download entire unedited codebase as plain text"
+              >
+                <Download className="w-3.5 h-3.5 text-[#d4a359]" />
+                <span>Download as TXT</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadCodebaseDirect}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 bg-[#1a1e28] hover:bg-[#232836] hover:text-white border border-[#272e3f] rounded-lg transition-colors cursor-pointer"
+                title="Download entire unedited codebase as Markdown"
+              >
+                <Download className="w-3.5 h-3.5 text-stone-400" />
+                <span>Save CODEBASE.md</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={handleDownloadSingle}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 bg-[#1a1e28] hover:bg-[#232836] hover:text-white border border-[#272e3f] rounded-lg transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-stone-400" />
+              <span>Save {displayFileName}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -211,7 +240,7 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
         <div className="px-4 py-2 bg-amber-950/30 border-b border-amber-800/40 flex items-center gap-2 text-xs text-amber-200">
           <AlertTriangle className="w-4 h-4 shrink-0 text-[#d4a359]" />
           <span>
-            Large Codebase Safeguard: Showing preview in browser DOM for smooth performance. <strong>100% of all {result.totalFiles.toLocaleString()} files ({formatBytes(result.fullCodebaseSize)})</strong> are fully preserved and unedited in the downloaded <code className="text-[#f5f1eb] font-mono font-bold">CODEBASE.md</code> and clipboard copy.
+            Large Codebase Safeguard: Showing preview in browser DOM for smooth performance. <strong>100% of all {result.totalFiles.toLocaleString()} files ({formatBytes(result.fullCodebaseSize)})</strong> are fully preserved and unedited in the downloaded <code className="text-[#f5f1eb] font-mono font-bold">CODEBASE.txt</code>, <code className="text-[#f5f1eb] font-mono font-bold">CODEBASE.md</code>, and clipboard copy.
           </span>
         </div>
       )}
@@ -268,22 +297,31 @@ export const BundlePreview: React.FC<BundlePreviewProps> = ({
       {/* Bottom Download CTA Bar */}
       <div className="p-4 border-t border-[#1e222d] bg-[#0e1017] flex flex-wrap items-center justify-between gap-4">
         <div className="text-xs text-stone-400">
-          Ready to export? Includes <span className="font-mono text-[#f5f1eb] font-semibold">CODEBASE.md</span> (for AI), <span className="font-mono text-[#f5f1eb] font-semibold">FILE_TREE.md</span>, and <span className="font-mono text-[#f5f1eb] font-semibold">{result.groups.length}</span> extension bundles.
+          Ready to export? Includes <span className="font-mono text-[#f5f1eb] font-semibold">CODEBASE.txt</span>, <span className="font-mono text-[#f5f1eb] font-semibold">CODEBASE.md</span>, <span className="font-mono text-[#f5f1eb] font-semibold">FILE_TREE.md</span>, and <span className="font-mono text-[#f5f1eb] font-semibold">{result.groups.length}</span> extension bundles.
         </div>
-        <div className="flex items-center gap-3 ml-auto">
+        <div className="flex flex-wrap items-center gap-2.5 ml-auto">
+          <button
+            type="button"
+            onClick={handleDownloadTextDirect}
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#202534] border border-[#2b3345] rounded-lg transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-[#d4a359]" />
+            <span>Download as TXT</span>
+          </button>
+
           <button
             type="button"
             onClick={handleDownloadCodebaseDirect}
-            className="flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#202534] border border-[#2b3345] rounded-lg transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#202534] border border-[#2b3345] rounded-lg transition-colors cursor-pointer"
           >
-            <Sparkles className="w-4 h-4 text-[#d4a359]" />
-            <span>Download CODEBASE.md (AI)</span>
+            <Sparkles className="w-3.5 h-3.5 text-[#d4a359]" />
+            <span>Download CODEBASE.md</span>
           </button>
 
           <button
             type="button"
             onClick={onDownloadZip}
-            className="flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-stone-950 bg-gradient-to-r from-[#e2b76c] to-[#c9944d] hover:from-[#ecc279] hover:to-[#d4a05a] rounded-lg transition-all shadow-[0_2px_12px_rgba(212,163,89,0.22)] cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-stone-950 bg-gradient-to-r from-[#e2b76c] to-[#c9944d] hover:from-[#ecc279] hover:to-[#d4a05a] rounded-lg transition-all shadow-[0_2px_12px_rgba(212,163,89,0.22)] cursor-pointer"
           >
             <Download className="w-4 h-4 stroke-[2.5]" />
             <span>Download All Bundles (ZIP)</span>
