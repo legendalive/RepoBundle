@@ -229,15 +229,18 @@ export async function processZipFile(
   // Sort all extracted files alphabetically by relative path for consistent reading order
   allExtractedEntries.sort((a, b) => a.path.localeCompare(b.path));
 
-  onProgress?.(65, 'Generating unified CODEBASE.md for AI context (100% verbatim)...');
+  onProgress?.(65, 'Generating CODEBASE.md & CODEBASE.txt (100% verbatim, unedited)...');
   await yieldToEventLoop();
 
-  // Assemble CODEBASE.md chunk-by-chunk to handle large repositories with low memory footprint
+  // Assemble CODEBASE.md and CODEBASE.txt chunk-by-chunk to handle large repositories with low memory footprint
   const codebaseChunks: string[] = [];
+  const codebaseTextChunks: string[] = [];
   let fullCodebasePreview = '';
   let isFullCodebaseTruncated = false;
 
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  
+  // Markdown Header
   const codebaseHeader = `# Repository Codebase: ${fileName}
 
 > Ingestion and AI context package generated on ${timestamp} UTC by RepoBundle.
@@ -260,7 +263,29 @@ ${asciiTree}
 ## Codebase Files
 `;
 
+  // Plain Text Header
+  const textHeader = `================================================================================
+REPOSITORY CODEBASE: ${fileName}
+================================================================================
+Generated on: ${timestamp} UTC by RepoBundle.
+Total Files: ${lightweightEntries.length.toLocaleString()}
+Total Directories: ${totalDirectories.toLocaleString()}
+Total Uncompressed Size: ${formatBytes(totalBytes)} (${totalBytes.toLocaleString()} bytes)
+Total Code Lines: ${totalCodeLines.toLocaleString()}
+All files are 100% verbatim and completely unedited.
+
+--------------------------------------------------------------------------------
+DIRECTORY HIERARCHY & FILE TREE
+--------------------------------------------------------------------------------
+${asciiTree}
+
+================================================================================
+SOURCE CODE FILES
+================================================================================
+`;
+
   codebaseChunks.push(codebaseHeader);
+  codebaseTextChunks.push(textHeader);
   fullCodebasePreview += codebaseHeader;
 
   const totalFilesToBundle = allExtractedEntries.length;
@@ -269,20 +294,25 @@ ${asciiTree}
 
     if (fIdx % 25 === 0) {
       const pct = 65 + Math.floor((fIdx / totalFilesToBundle) * 15);
-      onProgress?.(pct, `Compiling AI context: file ${fIdx + 1}/${totalFilesToBundle} (${entry.name})...`);
+      onProgress?.(pct, `Compiling codebase contexts: file ${fIdx + 1}/${totalFilesToBundle} (${entry.name})...`);
       await yieldToEventLoop();
     }
 
     if (entry.isBinary) {
+      // Markdown binary notice
       const binaryNotice = `\n---\n\n### File: \`${entry.path}\`\n\n*(Binary file · ${formatBytes(entry.size)} · Raw binary content omitted for LLM token efficiency)*\n`;
       codebaseChunks.push(binaryNotice);
+
+      // Plain text binary notice
+      const binaryTextNotice = `\n================================================================================\nFile: ${entry.path}\n================================================================================\n[Binary file · ${formatBytes(entry.size)} · Raw binary content omitted]\n`;
+      codebaseTextChunks.push(binaryTextNotice);
 
       if (!isFullCodebaseTruncated) {
         if (fullCodebasePreview.length + binaryNotice.length < MAX_PREVIEW_CHARS) {
           fullCodebasePreview += binaryNotice;
         } else {
           isFullCodebaseTruncated = true;
-          fullCodebasePreview += '\n\n... [PREVIEW TRUNCATED IN DOM VIEWER FOR BROWSER PERFORMANCE · 100% VERBATIM CODE IS PRESERVED IN CODEBASE.MD DOWNLOAD AND FULL CLIPBOARD COPY] ...\n';
+          fullCodebasePreview += '\n\n... [PREVIEW TRUNCATED IN DOM VIEWER FOR BROWSER PERFORMANCE · 100% VERBATIM CODE IS PRESERVED IN CODEBASE.MD / CODEBASE.TXT DOWNLOADS AND FULL CLIPBOARD COPY] ...\n';
         }
       }
     } else {
@@ -290,6 +320,7 @@ ${asciiTree}
       const fence = getSafeCodeFence(text);
       const lang = EXTENSION_TO_LANG[entry.extension] || entry.extension || '';
       
+      // Markdown file section (100% verbatim)
       const fileHeader = `\n---\n\n### File: \`${entry.path}\`\n${fence}${lang}\n`;
       const fileFooter = text.endsWith('\n') ? `${fence}\n` : `\n${fence}\n`;
 
@@ -297,13 +328,22 @@ ${asciiTree}
       codebaseChunks.push(text);
       codebaseChunks.push(fileFooter);
 
+      // Plain text file section (100% verbatim)
+      const fileTextHeader = `\n================================================================================\nFile: ${entry.path}\n================================================================================\n`;
+      codebaseTextChunks.push(fileTextHeader);
+      codebaseTextChunks.push(text);
+      if (!text.endsWith('\n')) {
+        codebaseTextChunks.push('\n');
+      }
+      codebaseTextChunks.push('\n');
+
       if (!isFullCodebaseTruncated) {
         const fullBlockLength = fileHeader.length + text.length + fileFooter.length;
         if (fullCodebasePreview.length + fullBlockLength < MAX_PREVIEW_CHARS) {
           fullCodebasePreview += fileHeader + text + fileFooter;
         } else {
           const remainingSpace = Math.max(0, MAX_PREVIEW_CHARS - fullCodebasePreview.length);
-          fullCodebasePreview += (fileHeader + text).substring(0, remainingSpace) + '\n\n... [PREVIEW TRUNCATED IN DOM VIEWER FOR BROWSER PERFORMANCE · 100% VERBATIM CODE IS PRESERVED IN CODEBASE.MD DOWNLOAD AND FULL CLIPBOARD COPY] ...\n';
+          fullCodebasePreview += (fileHeader + text).substring(0, remainingSpace) + '\n\n... [PREVIEW TRUNCATED IN DOM VIEWER FOR BROWSER PERFORMANCE · 100% VERBATIM CODE IS PRESERVED IN CODEBASE.MD / CODEBASE.TXT DOWNLOADS AND FULL CLIPBOARD COPY] ...\n';
           isFullCodebaseTruncated = true;
         }
       }
@@ -311,6 +351,7 @@ ${asciiTree}
   }
 
   const fullCodebaseBlob = new Blob(codebaseChunks, { type: 'text/markdown;charset=utf-8' });
+  const fullCodebaseTextBlob = new Blob(codebaseTextChunks, { type: 'text/plain;charset=utf-8' });
 
   onProgress?.(80, 'Consolidating files by extension (100% unaltered verbatim code)...');
   await yieldToEventLoop();
@@ -318,8 +359,9 @@ ${asciiTree}
   const groups: ExtensionGroup[] = [];
   const outputZip = new JSZip();
 
-  // Add the unified CODEBASE.md into the output ZIP archive as well
+  // Add the unified CODEBASE.md and CODEBASE.txt into the output ZIP archive as well
   outputZip.file('CODEBASE.md', fullCodebaseBlob);
+  outputZip.file('CODEBASE.txt', fullCodebaseTextBlob);
 
   // Sort groups by total file count descending
   const sortedExtensions = Array.from(extensionMap.keys()).sort((a, b) => {
@@ -482,6 +524,9 @@ ${asciiTree}
     isFullCodebaseTruncatedInPreview: isFullCodebaseTruncated,
     fullCodebaseSize: fullCodebaseBlob.size,
     fullCodebaseTotalLines: totalCodeLines,
+    // Unified single-file Codebase Plain Text (.txt)
+    fullCodebaseTextBlob,
+    fullCodebaseTextSize: fullCodebaseTextBlob.size,
   };
 }
 
