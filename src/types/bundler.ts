@@ -48,4 +48,7 @@ export interface BundlingResult {
   isFullCodebaseTruncatedInPreview: boolean;
   fullCodebaseSize: number;
   fullCodebaseTotalLines: number;
+  // Unified single-file Codebase Plain Text (.txt)
+  fullCodebaseTextBlob: Blob | null;
+  fullCodebaseTextSize: number;
 }
