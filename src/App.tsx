@@ -66,6 +66,11 @@ export default function App() {
     downloadBlob(result.fullCodebaseBlob, 'CODEBASE.md');
   };
 
+  const handleDownloadText = () => {
+    if (!result || !result.fullCodebaseTextBlob) return;
+    downloadBlob(result.fullCodebaseTextBlob, 'CODEBASE.txt');
+  };
+
   const handleReset = () => {
     setResult(null);
     setErrorMessage(null);
@@ -79,6 +84,7 @@ export default function App() {
       <Header
         onDownloadZip={handleDownloadAllZip}
         onDownloadCodebase={handleDownloadCodebase}
+        onDownloadText={handleDownloadText}
         hasResult={!!result}
         onReset={handleReset}
         activeTab={activeTab}
@@ -135,12 +141,12 @@ export default function App() {
                     <span className="text-xs text-emerald-400 font-medium">Bundled Successfully</span>
                   </div>
                   <div className="text-xs text-stone-400 mt-0.5 font-mono tabular-nums">
-                    {result.totalFiles.toLocaleString()} files detected · CODEBASE.md ready for AI ingestion
+                    {result.totalFiles.toLocaleString()} files detected · CODEBASE.txt &amp; CODEBASE.md ready
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
                   onClick={handleReset}
@@ -152,11 +158,22 @@ export default function App() {
 
                 <button
                   type="button"
+                  onClick={handleDownloadText}
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#222736] hover:text-white border border-[#2b3345] rounded-lg transition-colors cursor-pointer shadow-sm"
+                  title="Download entire unedited codebase as a single plain text (.txt) file"
+                >
+                  <FileText className="w-4 h-4 text-[#d4a359]" />
+                  <span>Download as TXT</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleDownloadCodebase}
-                  className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#222736] hover:text-white border border-[#2b3345] rounded-lg transition-colors cursor-pointer shadow-sm"
+                  className="flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-stone-200 bg-[#171b26] hover:bg-[#222736] hover:text-white border border-[#2b3345] rounded-lg transition-colors cursor-pointer shadow-sm"
+                  title="Download entire unedited codebase as a single Markdown (.md) file"
                 >
                   <Sparkles className="w-4 h-4 text-[#d4a359]" />
-                  <span>Download CODEBASE.md (For AI)</span>
+                  <span>Download as MD</span>
                 </button>
 
                 <button
@@ -165,7 +182,7 @@ export default function App() {
                   className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-stone-950 bg-gradient-to-r from-[#e2b76c] to-[#c9944d] hover:from-[#ecc279] hover:to-[#d4a05a] rounded-lg transition-all shadow-[0_2px_12px_rgba(212,163,89,0.22)] cursor-pointer"
                 >
                   <Download className="w-4 h-4 stroke-[2.5]" />
-                  <span>Download Bundled ZIP</span>
+                  <span>Download All (ZIP)</span>
                 </button>
               </div>
             </div>
@@ -195,7 +212,7 @@ export default function App() {
                     }`}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>CODEBASE.md (Full Codebase for AI)</span>
+                    <span>CODEBASE Viewer (Full Codebase)</span>
                   </button>
 
                   <button
