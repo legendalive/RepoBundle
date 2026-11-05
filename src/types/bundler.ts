@@ -42,4 +42,10 @@ export interface BundlingResult {
   outputZipBlob: Blob | null;
   outputZipSize: number;
   processingTimeMs: number;
+  // Unified single-file Codebase Markdown for AI context
+  fullCodebaseBlob: Blob | null;
+  fullCodebasePreview: string;
+  isFullCodebaseTruncatedInPreview: boolean;
+  fullCodebaseSize: number;
+  fullCodebaseTotalLines: number;
 }
